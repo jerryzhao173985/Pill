@@ -1,4 +1,99 @@
-# Changelog for using Pill as compiler
+# How SKILL Code Parsing and Interpretation Works in Pill
+
+## 1. Parsing Architecture
+
+The parsing of SKILL code is handled primarily in `interp.py` using the Parsimonious library. The process can be broken down into these key components:
+
+### Grammar Definition
+The SKILL grammar is defined using Parsimonious's grammar syntax (lines 50-150 in `interp.py`). This grammar describes the structure of SKILL code, including:
+- Procedures and functions
+- Control structures (if, when, unless, while, for, foreach)
+- Expressions and operators
+- Lists and associative lists
+- Variable assignments
+
+### Parser and Visitor Pattern
+The parsing follows the visitor pattern with the `Visitor` class (line ~207):
+1. The grammar is used to parse SKILL code into a syntax tree
+2. The `Visitor` class traverses this tree and generates Python bytecode
+3. Each AST node type has a corresponding `visit_*` method that handles code generation
+
+## 2. Code Generation
+
+The AST visitor translates SKILL constructs into Python bytecode:
+
+### Function and Expression Handling
+- Functions like `visit_procedure`, `visit_lambda`, and `visit_lambda2` (lines ~1370, ~1138, ~1161) handle procedure and lambda definitions
+- Expressions are processed in methods like `visit_ororexpr`, `visit_assign`, and `visit_value` (lines ~393, ~1282, ~850)
+
+### Control Flow
+- Control structures map to Python bytecode instructions:
+  - `visit_if` (line ~977) generates conditional jumps
+  - `visit_while`, `visit_foreach`, `visit_for` (lines ~884, ~1272, ~1185) generate loop structures
+  - `visit_case` (line ~994) handles case/switch statements
+
+### Code Object Creation
+- The `Code` class in `assembler.py` is used to construct Python bytecode
+- Each visit method typically returns a function that generates the appropriate bytecode when called with a reference flag
+
+## 3. Execution Model
+
+### Interpreter Bootstrap
+- The main entry point is in `run()` (line ~1494 in `interp.py`), which:
+  1. Parses the SKILL code using the grammar
+  2. Visits the resulting parse tree to generate Python bytecode
+  3. Executes the bytecode
+
+### Runtime Support
+- `runtime.py` provides implementations of SKILL built-in functions:
+  - Database access functions (`dbGet`, `dbCreateRect`, etc.)
+  - List manipulation (`car`, `cdr`, etc.)
+  - Type checking (`stringp`, `floatp`, etc.)
+  - Math operations
+
+### Environment and Context
+- The interpreter manages variable scopes, procedure contexts, and environment through:
+  - `context.py`: Manages execution context and environment
+  - Stack operations for variable scoping (`PushVars`/`PopVars`)
+
+## 4. Python Interface for SKILL Code
+
+To parse and execute SKILL code in Python:
+
+```python
+import interp
+
+# Parse and execute SKILL code directly
+result = interp.run('(procedure myProc (a b) (+ a b))')
+
+# Load and execute SKILL code from a file
+interp.load('path/to/skill/file.il')
+
+# Access the mocked SKILL environment
+interp.skill.variables  # Dictionary of variables
+interp.skill.procedures  # Dictionary of procedures
+
+# Call SKILL procedures from Python
+interp.skill.procedures['myProc'](1, 2)  # Calls the myProc procedure
+```
+
+## 5. Core Components of the Interpreter
+
+1. **Grammar Parser** (`interp.py`): Defines the SKILL language syntax and parses code
+2. **Bytecode Generator** (`assembler/assembler.py`): Compiles AST to Python bytecode
+3. **Runtime Environment** (`runtime.py`): Provides SKILL standard library functions
+4. **Execution Context** (`context.py`): Manages execution environment and state
+
+## 6. Implementation Details
+
+- SKILL expressions and statements are compiled to Python bytecode
+- The interpreter uses a hybrid approach: parsing with Parsimonious but executing as Python bytecode
+- Functions like `visit_exists`, `visit_setof` handle complex SKILL concepts by generating equivalent Python code
+- Error handling is managed through Python's exception system
+
+This architecture allows for translating SKILL code to Python bytecode, which can then execute efficiently within the Python runtime while maintaining SKILL's semantics and behavior.
+
+---
 
 ## Issues Addressed
 
