@@ -18,11 +18,26 @@
 #include "main.h"
 
 #include <regex>
+#include <arpa/inet.h>  // For network byte order conversion functions
 
 set<uint64_t> consumed;
 map<uint64_t,SList*> frompos;
 
 static bool big_endian;
+
+// Define byteswap functions for different platforms
+#ifdef __APPLE__
+    // macOS byteswap functions
+    #include <libkern/OSByteOrder.h>
+    #define __bswap_16(x) OSSwapInt16(x)
+    #define __bswap_32(x) OSSwapInt32(x)
+    #define __bswap_64(x) OSSwapInt64(x)
+#elif defined(__GNUC__)
+    // GCC byteswap builtins
+    #define __bswap_16(x) __builtin_bswap16(x)
+    #define __bswap_32(x) __builtin_bswap32(x)
+    #define __bswap_64(x) __builtin_bswap64(x)
+#endif
 
 #define __nswap_16(x) (big_endian?__bswap_16(x):x)
 #define __nswap_32(x) (big_endian?__bswap_32(x):x)
@@ -893,7 +908,7 @@ void consume_props(SList *l, bool root=true){
       }
       l->m_noparen = !root;
    }
-   for(auto it=l->m_list.begin(); it != l->m_list.end(); it++){
+   for(auto it=l->m_list.begin(); it!=l->m_list.end(); it++){
       if(*it)
          consume_props(*it,false);
    }

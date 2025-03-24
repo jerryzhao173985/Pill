@@ -224,19 +224,19 @@ class Visitor(NodeVisitor):
         for k,v in comps.items():
            setattr(self, "visit_" + k, types.MethodType(lambda self, node, children, v=v: self.compexpr(node,children,v), self))
       
-        binary = { "bandexpr" : [Code.BINARY_AND],      "plusexpr" : [Code.BINARY_ADD], "diffexpr" : [Code.BINARY_SUBTRACT],
-                   "borexpr"  : [Code.BINARY_OR],       "bxorexpr" : [Code.BINARY_XOR],  "divexpr" : [Code.BINARY_DIVIDE], 
-                   "mulexpr"  : [Code.BINARY_MULTIPLY],  "expexpr" : [Code.BINARY_POWER], "rsexpr" : [Code.BINARY_RSHIFT],
-                   "lsexpr"   : [Code.BINARY_LSHIFT],
-                   "bnorexpr" : [Code.BINARY_OR, Code.UNARY_INVERT],
-                   "bnandexpr": [Code.BINARY_AND, Code.UNARY_INVERT],
-                   "bxnorexpr": [Code.BINARY_XOR, Code.UNARY_INVERT],
-                   "getrefexpr"   : [Code.BINARY_LSHIFT],} #TODO: not implemented
+        binary = { "bandexpr" : ["BINARY_AND"],      "plusexpr" : ["BINARY_ADD"], "diffexpr" : ["BINARY_SUBTRACT"],
+                   "borexpr"  : ["BINARY_OR"],       "bxorexpr" : ["BINARY_XOR"],  "divexpr" : ["BINARY_TRUE_DIVIDE"], 
+                   "mulexpr"  : ["BINARY_MULTIPLY"],  "expexpr" : ["BINARY_POWER"], "rsexpr" : ["BINARY_RSHIFT"],
+                   "lsexpr"   : ["BINARY_LSHIFT"],
+                   "bnorexpr" : ["BINARY_OR", "UNARY_INVERT"],
+                   "bnandexpr": ["BINARY_AND", "UNARY_INVERT"],
+                   "bxnorexpr": ["BINARY_XOR", "UNARY_INVERT"],
+                   "getrefexpr"   : ["BINARY_LSHIFT"],} #TODO: not implemented
         for k,v in binary.items():
            setattr(self, "visit_" + k, types.MethodType(lambda self, node, children, v=v: self.binexpr(node,children,v), self))
       
-        unary = { "negexpr" : [0,Code.UNARY_NEGATIVE,False], "bnotexpr" : [0,Code.UNARY_INVERT,False], "notexpr" : [0,Code.UNARY_NOT,True],
-                  "dotexpr" : [0,Code.UNARY_NEGATIVE,False]}
+        unary = { "negexpr" : [0,"UNARY_NEGATIVE",False], "bnotexpr" : [0,"UNARY_INVERT",False], "notexpr" : [0,"UNARY_NOT",True],
+                  "dotexpr" : [0,"UNARY_NEGATIVE",False]}
 
         for k,v in unary.items():
            setattr(self, "visit_" + k, types.MethodType(lambda self, node, children, v=v: self.unaexpr(node,children,v), self))
@@ -272,7 +272,7 @@ class Visitor(NodeVisitor):
     def binexpr(self, node, children, ops):
        def gen_binexpr(ref=False,children=children,node=node,ops=ops):
           r = children[0](ref=ref)
-          #is_sub=ops[0] == Code.BINARY_SUBTRACT
+          #is_sub=ops[0] == "BINARY_SUBTRACT"
           #print node.expr_name
           if children[1]:
              ps = self.c.stack_size
@@ -281,7 +281,8 @@ class Visitor(NodeVisitor):
                 #if is_sub:
                 # self.pprint("B: ")
                 for op in ops:
-                   op(self.c)
+                   # Call method by name
+                   getattr(self.c, op)()
              assert(ps == self.c.stack_size and ref==False)
           return r
        return gen_binexpr
@@ -309,7 +310,8 @@ class Visitor(NodeVisitor):
           if children[op[0]]:
              if op[2]:
                self.coerse()
-             op[1](self.c)
+             # Call method by name
+             getattr(self.c, op[1])()
           else:
              return r
        return gen_unaexpr
@@ -1330,12 +1332,12 @@ class Visitor(NodeVisitor):
        self.c.PRINT_EXPR()
 
     def prolog(self):
-       self.c.LOAD_GLOBAL('skill')
-       self.c.LOAD_ATTR('procedures')
+       self.c.LOAD_GLOBAL((False, 'skill'))
+       self.c.LOAD_ATTR((False, 'procedures'))
        self.c.STORE_FAST('#procs')
 
-       self.c.LOAD_GLOBAL('skill')
-       self.c.LOAD_ATTR('variables')
+       self.c.LOAD_GLOBAL((False, 'skill'))
+       self.c.LOAD_ATTR((False, 'variables'))
        self.c.STORE_FAST('#vars')
 
     def push_lambda(self):
@@ -1370,74 +1372,79 @@ class Visitor(NodeVisitor):
         # PROCEDURE LPAR ws? identifier LPAR ws? (identifier ws?)* string? ws? (OPTIONAL ws? (identifier ws?)*)? RPAR ws? stmts RPAR
         # PROCEDURE ws? LPAR ws? identifier ws? LPAR ws? (identifier ws?)* string? ws? (OPTIONAL ws? LPAR ((identifier/NIL) ws? RPAR)*)? RPAR ws? stmts RPAR
 
-        def gen_procedure():
-           self.c = Code()
-           self.code_stack.append(self.c)
+        def gen_procedure(children=None,node=None):
+           def process_procedure(children=children,node=node):
+               name = children[4]()[1]
+               self.c = Code()
+               self.code_stack.append(self.c)
 
-           self.c.co_argcount = 0
-           self.c.co_varnames = []
-           self.c.co_firstlineno = 1
-           self.c.co_filename = self.filename;
+               self.c.co_name = name
+               self.c.co_firstlineno = 1
+               self.c.co_argcount = 0
+               self.locals.append([])
 
-           proc = children[4]()[1]
-           if proc == "pcGenCell":
-              proc = proc + "_" + self.filename.split(".")[0].replace("/","_") 
-           #print proc
-           self.c.co_name = proc
+               print(f"Debug - procedure parse: {name}")
+               print(f"Debug - children length: {len(children)}")
+               for i, child in enumerate(children):
+                   print(f"Debug - children[{i}]: {child}")
 
-           self.locals.append([])
+               if children[8] is None:
+                   print("Debug - children[8] is None!")
+               else:
+                   for e in children[8]:
+                      self.locals[-1].append(e[0]()[1])
+                      self.c.co_argcount += 1
+                      self.c.co_varnames.append(e[0]()[1])
 
-           for e in children[8]:
-              self.locals[-1].append(e[0]()[1])
-              self.c.co_argcount += 1
-              self.c.co_varnames.append(e[0]()[1])
+               self.prolog()
 
-           self.prolog()
-
-           #init and push var
-           self.c.LOAD_GLOBAL("PushVars")
-           for e in self.locals[-1]:
-              self.c.LOAD_CONST(e)
-           self.c.BUILD_LIST(len(self.locals[-1]))
-           self.c.CALL_FUNCTION(1)
-           self.c.POP_TOP()
-        
-           #load arguments
-           for e in self.locals[-1]:              
-              self.c.LOAD_FAST(e)
-              self.c.LOAD_FAST("#vars")
-              self.c.LOAD_CONST(e)
-              self.c.STORE_SUBSCR()
+               #init and push var
+               self.c.LOAD_GLOBAL((False, "PushVars"))
+               for e in self.locals[-1]:
+                  self.c.LOAD_CONST(e)
+                  self.c.BUILD_LIST(len(self.locals[-1]))
+                  self.c.CALL_FUNCTION(1)
+                  self.c.POP_TOP()
+               
+               #load arguments
+               for e in self.locals[-1]:              
+                  self.c.LOAD_FAST(e)
+                  self.c.LOAD_FAST("#vars")
+                  self.c.LOAD_CONST(e)
+                  self.c.STORE_SUBSCR()
 
 
-           self.c.LOAD_CONST(None) #Nil is default return value
-           children[14]()
- 
-           #self.pprint("prepop: ")
+               self.c.LOAD_CONST(None) #Nil is default return value
 
-           for r in self.returns:
-              r()
+               # Add debug print for children[14]
+               if children[14] is None:
+                   print("Debug - children[14] is None!")
+               else:
+                   children[14]()
+   
+               #self.pprint("prepop: ")
 
-           #restore var
-           self.c.LOAD_GLOBAL("PopVars")
-           for e in self.locals[-1]:
-              self.c.LOAD_CONST(e)
-           self.c.BUILD_LIST(len(self.locals[-1]))
-           self.c.CALL_FUNCTION(1,0)
-           self.c.POP_TOP()
+               for r in self.returns:
+                   r()
 
-           self.locals = self.locals[:-1]  
- 
-           #print "ssr: " + str(self.c.stack_size)
+               self.c.LOAD_GLOBAL((False, "PopVars"))
+               self.c.CALL_FUNCTION(0)
+               self.c.POP_TOP()
 
-           self.c.RETURN_VALUE()
+               self.returns = []
 
-           f = types.FunctionType(self.c.code(),globals())
-           skill.procedures[proc] = f
-           skill.iprocs[proc] = f.__code__
-           self.code_stack = self.code_stack[:-1]
-           self.c = self.code_stack[-1]
-           self.c.LOAD_CONST(True)
+               self.c.RETURN_VALUE()
+               f = types.FunctionType(self.c.code(),globals())
+               #dis(self.c.code())
+
+               self.code_stack = self.code_stack[:-1]
+               self.c = self.code_stack[-1]
+               self.locals.pop()
+
+               print("PROC: ", name, "args:", self.c.co_argcount)
+               skill.procedures[name] = f
+               skill.iprocs[name] = f.__code__
+           return process_procedure
         return gen_procedure
 
     def visit_block(self,node,children):

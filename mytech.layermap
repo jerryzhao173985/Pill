@@ -1,0 +1,8 @@
+# Simple layermap file
+# Format: name purpose layer datatype
+diff drawing 1 0
+poly drawing 2 0
+li1  drawing 3 0
+met1 drawing 4 0
+licon1 drawing 5 0
+mcon drawing 6 0

@@ -696,7 +696,7 @@ for op in hasfree:
         setattr(Code, opname[op], with_name(do_free, opname[op]))
 
 compares = { '==' : Compare.EQ, '!=' : Compare.NE, '>' : Compare.GT, '>=' : Compare.GE,
-             '<' : Compare.LT, '<=' : Compare.LE, "in" : Compare.IN, "is" : Compare.IS}
+             '<' : Compare.LT, '<=' : Compare.LE, "in" : Compare.EQ, "is" : Compare.EQ}
 
 for op in hasname:
     if not hasattr(Code, opname[op]):

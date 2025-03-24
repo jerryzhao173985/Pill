@@ -19,6 +19,17 @@
 
 import klayout.db as db
 
+def create_bbox(pts):
+    """Calculate bounding box from a list of points"""
+    if not pts or len(pts) == 0:
+        return [[0, 0], [0, 0]]  # Empty bbox
+    
+    min_x = min(p[0] for p in pts)
+    min_y = min(p[1] for p in pts)
+    max_x = max(p[0] for p in pts)
+    max_y = max(p[1] for p in pts)
+    
+    return [[min_x, min_y], [max_x, max_y]]
 
 def Path(dpts,width,justification):
    path = db.DPath.new()
