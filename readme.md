@@ -1,4 +1,4 @@
-# Changelog for using it as compiler
+# Changelog for using Pill as compiler
 
 ## Issues Addressed
 
